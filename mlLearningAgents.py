@@ -55,6 +55,8 @@ class QLearnAgent(Agent):
         self.prev_state = None
         # placeholder of the previous action
         self.prev_action = None
+        # placeholder of the previous score
+        self.prev_score = None
 
 
     # Accessor functions for the variable episodesSoFars controlling learning
@@ -94,11 +96,12 @@ class QLearnAgent(Agent):
         Data about current state
         """
         legal = state.getLegalPacmanActions()
-        if Directions.STOP in legal:
+        if Directions.STOP in legal:# register a' as a
             legal.remove(Directions.STOP)
-        pacman_position = state.getPacmanPosition())
-        ghost_positions = state.getGhostPositions())
-        food_locations = state.getFood())
+        pacman_position = state.getPacmanPosition()
+        ghost_positions = state.getGhostPositions()
+        food_locations = state.getFood()
+        # construct s'
         curr_state = (str(legal), str(pacman_position), str(ghost_positions), str(food_locations))
         if debug_mode:
             print("Legal moves: " + curr_state[0])
@@ -109,19 +112,24 @@ class QLearnAgent(Agent):
             print("Score: " + str(state.getScore()) + "\n")
 
         """
-        Sanity check inside data structure
+        Initialize Q-value of a new state
         """
         if curr_state not in self.Q_values:
             self.Q_values[curr_state] = dict()
             for action in legal:
-                self.Q_values[curr_state][action] = 0.0
+                if action not in self.Q_values[curr_state]:
+                    self.Q_values[curr_state][action] = 0.0
 
         """
         Starting step of a round
         """
         if self.prev_state == None:
+            # register s' as s
             self.prev_state = curr_state
+            # register a' as a
             self.prev_action = random.choice(legal)
+            # register as previous score
+            self.prev_score = state.getScore()
             return self.prev_action
 
         """
@@ -131,34 +139,38 @@ class QLearnAgent(Agent):
             # calculate max(Q(s, a))
             max_Q_value = None
             for action in legal:
-                if max_Q_value = None:
+                if max_Q_value == None:
                     max_Q_value = self.Q_values[curr_state][action]
                 if self.Q_values[curr_state][action] > max_Q_value:
                     max_Q_value = self.Q_values[curr_state][action]
             # calculate R(s)
-            reward = state.getScore() - self.prev_state.getScore()
+            reward = state.getScore() - self.prev_score
             # update Q(s, a)
-            self.Q_values[self.prev_state][self.prev_action] += (alpha * (reward - gamma * max_Q_value - self.Q_values[prev_state][prev_action]))
+            self.Q_values[self.prev_state][self.prev_action] += (self.alpha * (reward - self.gamma * max_Q_value - self.Q_values[self.prev_state][self.prev_action]))
+            # register s' as s
             self.prev_state = curr_state
-            self.prev_action = self.epsilon_greedy(state)
+            # register a' as a
+            self.prev_action = self.epsilon_greedy(curr_state, legal)
+            # register as previous score
+            self.prev_score = state.getScore()
             return self.prev_action
 
         """
         Non-training episodes
         """
+        # register s' as s
         self.prev_state = curr_state
-        self.prev_action = self.epsilon_greedy(state)
+        # register a' as a
+        self.prev_action = self.epsilon_greedy(curr_state, legal)
+        # register as previous score
+        self.prev_score = state.getScore()
         return self.prev_action
 
 
     """
-    ϵ-greedy action selection
+    epsilon-greedy action selection
     """
-    def epsilon_greedy(self, state):
-        # find legal actions & remove STOP
-        legal = state.getLegalPacmanActions()
-        if Directions.STOP in legal:
-            legal.remove(Directions.STOP)
+    def epsilon_greedy(self, state, legal):
         # generate a random probability
         probability = random.random()
         # if probability is less than exploration rate: random action
@@ -168,7 +180,7 @@ class QLearnAgent(Agent):
         # if probability is greater than exploration rate: max Q-value action
         max_Q_action = None
         for action in legal:
-            if max_Q_action = None:
+            if max_Q_action == None:
                 max_Q_action = action
                 continue
             if self.Q_values[state][action] > self.Q_values[state][max_Q_action]:
@@ -195,3 +207,4 @@ class QLearnAgent(Agent):
         # reset memory for a new round
         self.prev_state = None
         self.prev_action = None
+        self.prev_score = None
