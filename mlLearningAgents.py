@@ -34,7 +34,7 @@ import util
 class QLearnAgent(Agent):
 
     # Constructor, called when we start running the
-    def __init__(self, alpha=0.2, epsilon=0.05, gamma=0.8, numTraining = 10):
+    def __init__(self, alpha=0.2, epsilon=0.1, gamma=0.8, numTraining = 10):
         # alpha       - learning rate
         # epsilon     - exploration rate
         # gamma       - discount factor
@@ -96,7 +96,7 @@ class QLearnAgent(Agent):
         Data about current state
         """
         legal = state.getLegalPacmanActions()
-        if Directions.STOP in legal:# register a' as a
+        if Directions.STOP in legal:
             legal.remove(Directions.STOP)
         pacman_position = state.getPacmanPosition()
         ghost_positions = state.getGhostPositions()
@@ -111,64 +111,58 @@ class QLearnAgent(Agent):
             print(curr_state[3])
             print("Score: " + str(state.getScore()) + "\n")
 
-        """
-        Initialize Q-value of a new state
-        """
-        if curr_state not in self.Q_values:
-            self.Q_values[curr_state] = dict()
-            for action in legal:
-                if action not in self.Q_values[curr_state]:
-                    self.Q_values[curr_state][action] = 0.0
+        # initialize Q-value
+        if state not in self.Q_values:
+            self.initialize_Q_values(state, legal)
 
-        """
-        Starting step of a round
-        """
-        if self.prev_state == None:
-            # register s' as s
-            self.prev_state = curr_state
-            # register a' as a
-            self.prev_action = random.choice(legal)
-            # register as previous score
-            self.prev_score = state.getScore()
-            return self.prev_action
+        # update Q-value
+        if self.prev_state != None:
+            self.update_Q_value(state)
 
-        """
-        Training episodes
-        """
-        if self.episodesSoFar < self.numTraining:
-            # calculate max(Q(s, a))
-            max_Q_value = None
-            for action in legal:
-                if max_Q_value == None:
-                    max_Q_value = self.Q_values[curr_state][action]
-                if self.Q_values[curr_state][action] > max_Q_value:
-                    max_Q_value = self.Q_values[curr_state][action]
-            # calculate R(s)
-            reward = state.getScore() - self.prev_score
-            # update Q(s, a)
-            self.Q_values[self.prev_state][self.prev_action] += (self.alpha * (reward - self.gamma * max_Q_value - self.Q_values[self.prev_state][self.prev_action]))
-            # register s' as s
-            self.prev_state = curr_state
-            # register a' as a
-            self.prev_action = self.epsilon_greedy(curr_state, legal)
-            # register as previous score
-            self.prev_score = state.getScore()
-            return self.prev_action
+        # update placeholders
+        self.update_placeholders(state, legal)
 
-        """
-        Non-training episodes
-        """
-        # register s' as s
-        self.prev_state = curr_state
-        # register a' as a
-        self.prev_action = self.epsilon_greedy(curr_state, legal)
-        # register as previous score
-        self.prev_score = state.getScore()
         return self.prev_action
 
 
     """
-    epsilon-greedy action selection
+    training episodes: initialize Q-values
+    """
+    def initialize_Q_values(self, state, legal):
+        self.Q_values[state] = dict()
+        for action in legal:
+            if action not in self.Q_values[state]:
+                self.Q_values[state][action] = 0.0
+
+
+    """
+    training episodes: update Q-value
+    """
+    def update_Q_value(self, state, final_step=False):
+        # calculate R(s)
+        reward = state.getScore() - self.prev_score
+        # calculate max(Q(s', a'))
+        max_Q_value = 0.0
+        if not final_step:
+            max_Q_value = max(list(self.Q_values[state].values()))
+        # update Q(s, a)
+        self.Q_values[self.prev_state][self.prev_action] += (self.alpha * (reward + self.gamma * max_Q_value - self.Q_values[self.prev_state][self.prev_action]))
+
+
+    """
+    update placeholders
+    """
+    def update_placeholders(self, state, legal):
+        # register s' as s
+        self.prev_state = state
+        # register a' as a
+        self.prev_action = self.epsilon_greedy(state, legal)
+        # register as previous score
+        self.prev_score = state.getScore()
+
+
+    """
+    action selection: epsilon-greedy
     """
     def epsilon_greedy(self, state, legal):
         # generate a random probability
@@ -182,18 +176,31 @@ class QLearnAgent(Agent):
         for action in legal:
             if max_Q_action == None:
                 max_Q_action = action
-                continue
             if self.Q_values[state][action] > self.Q_values[state][max_Q_action]:
                 max_Q_action = action
         return max_Q_action
 
 
+    """
+    Reset placeholder variables
+    """
+    def reset_placeholders(self):
+        self.prev_state = None
+        self.prev_action = None
+        self.prev_score = None
+
+
     # Handle the end of episodes
     #
     # This is called by the game after a win or a loss.
-    def final(self, state):
+    def final(self, state, debug_mode=True):
 
-        print("A game just ended!")
+        # update Q-value
+        if self.prev_state != None:
+            self.update_Q_value(state, final_step=True)
+
+        # reset placeholder variables
+        self.reset_placeholders()
 
         # Keep track of the number of games played, and set learning
         # parameters to zero when we are done with the pre-set number
@@ -204,7 +211,3 @@ class QLearnAgent(Agent):
             print("%s\n%s" % (msg,"-" * len(msg)))
             self.setAlpha(0)
             self.setEpsilon(0)
-        # reset memory for a new round
-        self.prev_state = None
-        self.prev_action = None
-        self.prev_score = None
